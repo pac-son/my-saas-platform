@@ -1,4 +1,5 @@
 import { pgTable, uuid, varchar, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 // 1. Enums force data integrity (No invalid statuses allowed)
 export const currencyEnum = pgEnum('currency', ['NGN', 'USD']);
@@ -34,3 +35,25 @@ export const transactions = pgTable('transactions', {
   description: varchar('description', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  wallet: one(wallets, {
+    fields: [users.id],
+    references: [wallets.userId],
+  }),
+}));
+
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [wallets.userId],
+    references: [users.id],
+  }),
+  transactions: many(transactions),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [transactions.walletId],
+    references: [wallets.id],
+  }),
+}));
