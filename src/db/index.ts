@@ -1,13 +1,16 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 
-// 1. Force error if the URL is missing (Safety Check)
+// 1. Force Neon to use the 'ws' package (Required for local Node.js)
+neonConfig.webSocketConstructor = ws;
+
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is missing in .env file');
 }
 
-// 2. Create the SQL connection
-const sql = neon(process.env.DATABASE_URL);
+// 2. Create a connection Pool (This supports Transactions)
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// 3. Export the DB client to use in your API
-export const db = drizzle(sql);
+// 3. Export the DB client
+export const db = drizzle(pool);
