@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, timestamp, pgEnum, text } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // 1. Enums force data integrity (No invalid statuses allowed)
@@ -8,7 +8,7 @@ export const statusEnum = pgEnum('status', ['pending', 'completed', 'failed']);
 
 // 2. Users Table (Linked to your future Auth system)
 export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: text('id').primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   fullName: varchar('full_name', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
@@ -17,7 +17,7 @@ export const users = pgTable('users', {
 // 3. Wallets Table
 export const wallets = pgTable('wallets', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
+  userId: text('user_id').references(() => users.id).notNull(),
   currency: currencyEnum('currency').default('NGN').notNull(),
   balance: integer('balance').default(0).notNull(), // Stored in KOBO/CENTS
   createdAt: timestamp('created_at').defaultNow(),
