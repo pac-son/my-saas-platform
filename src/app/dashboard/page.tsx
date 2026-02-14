@@ -1,24 +1,53 @@
-import { db } from '@/db';
-import { wallets, transactions } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
-
-const MOCK_USER_ID = '09f72c1e-1c6a-4db3-8c5a-42827f7410e7'; 
+import { currentUser } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { users, wallets, transactions } from "@/db/schema"; // Ensure imports match your schema
+import { eq, desc } from "drizzle-orm";
+import { redirect } from "next/navigation";
 
 export default async function Dashboard() {
-  // 1. Fetch Wallet & Transactions in Parallel (Fast!)
+  // 1. Get the real user from Clerk
+  const authUser = await currentUser();
+
+  if (!authUser) {
+    redirect("/sign-in");
+  }
+
+  // 2. Check if this user exists in OUR database
+  let dbUser = await db.query.users.findFirst({
+    where: eq(users.id, authUser.id),
+  });
+
+  // 3. If they don't exist, create them + a wallet (Lazy Sync)
+  if (!dbUser) {
+    await db.transaction(async (tx) => {
+      // A. Create User
+      await tx.insert(users).values({
+        id: authUser.id, // Use Clerk's ID (e.g. "user_2b7...")
+        email: authUser.emailAddresses[0].emailAddress,
+        fullName: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim(),
+      });
+
+      // B. Create Wallet
+      await tx.insert(wallets).values({
+        userId: authUser.id,
+        currency: 'NGN',
+        balance: 0,
+      });
+    });
+  }
+
+  // 4. Fetch the Wallet & Transactions
   const wallet = await db.query.wallets.findFirst({
-    where: eq(wallets.userId, MOCK_USER_ID),
+    where: eq(wallets.userId, authUser.id),
     with: {
       transactions: {
         limit: 5,
-        orderBy: [desc(transactions.createdAt)], // Newest first
+        orderBy: [desc(transactions.createdAt)],
       },
     },
   });
 
-  if (!wallet) {
-    return <div className="p-8 text-red-500">No wallet found. Check the MOCK_USER_ID.</div>;
-  }
+  if (!wallet) return <div>Error loading wallet...</div>;
 
   return (
     <main className="min-h-screen bg-gray-50 p-8">
@@ -27,7 +56,17 @@ export default async function Dashboard() {
         {/* Header */}
         <header className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">My Savings</h1>
-          <span className="text-sm text-gray-500">User: {MOCK_USER_ID.slice(0, 8)}...</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">{authUser.emailAddresses[0].emailAddress}</span>
+            {/* Clerk's User Button (Logout, Profile) */}
+             <div className="h-8 w-8 bg-gray-200 rounded-full overflow-hidden">
+                <img src={authUser.imageUrl} alt="Profile" />
+             </div>
+          </div>
+          {/* Add this inside the header section, just below the email/profile pic */}
+            <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-gray-500 font-mono">
+              Wallet ID: {wallet.id}
+            </div>
         </header>
 
         {/* 💳 Balance Card */}
@@ -38,7 +77,7 @@ export default async function Dashboard() {
               {wallet.currency} {(wallet.balance / 100).toFixed(2)}
             </span>
             <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full">
-              Active
+              Live
             </span>
           </div>
         </div>
@@ -61,7 +100,7 @@ export default async function Dashboard() {
               {wallet.transactions.map((txn) => (
                 <tr key={txn.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
-                    {new Date(txn.createdAt).toLocaleDateString()}
+                    {new Date(txn.createdAt!).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 capitalize">{txn.type}</td>
                   <td className={`px-6 py-4 text-right font-medium ${
@@ -82,7 +121,7 @@ export default async function Dashboard() {
           
           {wallet.transactions.length === 0 && (
             <div className="p-8 text-center text-gray-500">
-              No transactions yet. Go make a deposit!
+              No transactions yet.
             </div>
           )}
         </div>
