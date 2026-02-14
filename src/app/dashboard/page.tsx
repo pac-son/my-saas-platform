@@ -1,6 +1,7 @@
+import DepositButton from "@/components/deposit-button";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, wallets, transactions } from "@/db/schema"; // Ensure imports match your schema
+import { users, wallets, transactions } from "@/db/schema"; 
 import { eq, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -80,6 +81,10 @@ export default async function Dashboard() {
               Live
             </span>
           </div>
+        </div>
+
+        <div>
+          <DepositButton walletId={wallet.id} />
         </div>
 
         {/* 📄 Transaction History */}
