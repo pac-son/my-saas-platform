@@ -10,25 +10,30 @@ export default function DepositButton({ walletId }: { walletId: string }) {
   const handleDeposit = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/deposit", {
+      const res = await fetch("/api/deposits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletId,
-          amount: 5000, // Hardcoded 5000 NGN for demo
+          amount: 5000, 
           reference: `DEMO-${Date.now()}`,
         }),
       });
 
-      if (res.ok) {
-        alert("Deposit Successful!");
-        router.refresh(); // ✨ Refreshes the server data instantly
-      } else {
-        alert("Deposit failed");
+      const data = await res.json();
+
+      if (!res.ok) {
+        // 👇 Now we see the REAL error message from the server
+        throw new Error(data.error || "Failed to deposit");
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error");
+
+      alert("Deposit Successful! 💸");
+      router.refresh(); 
+      
+    } catch (e: any) {
+      console.error("Deposit Error:", e);
+      // 👇 Shows the specific error (e.g., "Network Error" or "Deposit must be positive")
+      alert(e.message);
     } finally {
       setLoading(false);
     }

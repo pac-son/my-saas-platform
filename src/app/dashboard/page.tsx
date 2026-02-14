@@ -1,4 +1,4 @@
-import DepositButton from "@/components/deposit-button";
+import DepositModal from "@/components/deposit-modal";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { users, wallets, transactions } from "@/db/schema"; 
@@ -84,7 +84,7 @@ export default async function Dashboard() {
         </div>
 
         <div>
-          <DepositButton walletId={wallet.id} />
+          <DepositModal walletId={wallet.id} />
         </div>
 
         {/* 📄 Transaction History */}
