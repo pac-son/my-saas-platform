@@ -3,7 +3,7 @@ import { relations } from 'drizzle-orm';
 
 // 1. Enums force data integrity (No invalid statuses allowed)
 export const currencyEnum = pgEnum('currency', ['NGN', 'USD']);
-export const txnTypeEnum = pgEnum('txn_type', ['deposit', 'withdrawal', 'interest', 'fee']);
+export const txnTypeEnum = pgEnum('txn_type', ['deposit', 'withdrawal', 'interest', 'fee', 'transfer']);
 export const statusEnum = pgEnum('status', ['pending', 'completed', 'failed']);
 
 // 2. Users Table (Linked to your future Auth system)
