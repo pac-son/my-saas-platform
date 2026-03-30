@@ -5,6 +5,7 @@ import { users, wallets, transactions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import TransferModal from "@/components/transfer-modal";
+import WithdrawalModal from "@/components/withdrawal-modal";
 
 export default async function Dashboard() {
   // 1. Get the real user from Clerk
@@ -85,6 +86,7 @@ export default async function Dashboard() {
         </div>
 
         <div>
+          <WithdrawalModal walletId={wallet.id} />
           <TransferModal />
           <DepositModal walletId={wallet.id} />
         </div>

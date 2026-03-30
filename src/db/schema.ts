@@ -36,6 +36,17 @@ export const transactions = pgTable('transactions', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const vaults = pgTable('vaults', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull().references(() => users.id),
+  name: varchar('name', { length: 255 }).notNull(), // e.g., "New Laptop"
+  targetAmount: integer('target_amount').notNull(), // Goal amount in kobo/cents
+  currentAmount: integer('current_amount').notNull().default(0), // Amount saved so far
+  status: varchar('status', { length: 50 }).notNull().default('active'), // 'active' or 'completed'
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   wallet: one(wallets, {
     fields: [users.id],
