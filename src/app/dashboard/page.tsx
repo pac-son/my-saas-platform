@@ -1,11 +1,12 @@
 import DepositModal from "@/components/deposit-modal";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, wallets, transactions } from "@/db/schema"; 
+import { users, wallets, transactions, vaults } from "@/db/schema"; 
 import { eq, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import TransferModal from "@/components/transfer-modal";
 import WithdrawalModal from "@/components/withdrawal-modal";
+import CreateVaultModal from "@/components/create-vault-modal";
 
 export default async function Dashboard() {
   // 1. Get the real user from Clerk
@@ -52,6 +53,12 @@ export default async function Dashboard() {
 
   if (!wallet) return <div>Error loading wallet...</div>;
 
+  // Fetch the user's vaults
+  const userVaults = await db.query.vaults.findMany({
+    where: eq(vaults.userId, authUser.id),
+    orderBy: [desc(vaults.createdAt)],
+  });
+
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -91,6 +98,46 @@ export default async function Dashboard() {
           <DepositModal walletId={wallet.id} />
         </div>
 
+        {/*  Savings Vaults Section */}
+        <div className="space-y-4 pt-4">
+          <h3 className="font-semibold text-gray-900 text-lg">My Savings Goals</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* List existing vaults */}
+            {userVaults.map((vault) => {
+              const progress = Math.min((vault.currentAmount / vault.targetAmount) * 100, 100);
+              
+              return (
+                <div key={vault.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <h4 className="font-medium text-gray-900">{vault.name}</h4>
+                    <span className="text-xs font-medium px-2 py-1 bg-blue-50 text-blue-700 rounded-full capitalize">
+                      {vault.status}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-500">₦{(vault.currentAmount / 100).toFixed(2)}</span>
+                      <span className="text-gray-900 font-medium">Goal: ₦{(vault.targetAmount / 100).toFixed(2)}</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                      <div 
+                        className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" 
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* The Create Button Component */}
+            <CreateVaultModal />
+          </div>
+        </div>
+        
         {/* 📄 Transaction History */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
