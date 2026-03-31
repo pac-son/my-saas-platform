@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import TransferModal from "@/components/transfer-modal";
 import WithdrawalModal from "@/components/withdrawal-modal";
 import CreateVaultModal from "@/components/create-vault-modal";
+import FundVaultModal from "@/components/fund-vault-modal";
 
 export default async function Dashboard() {
   // 1. Get the real user from Clerk
@@ -128,6 +129,10 @@ export default async function Dashboard() {
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
+                    {/* ADD THIS BUTTON IF VAULT IS ACTIVE */}
+                    {vault.status === 'active' && (
+                      <FundVaultModal vaultId={vault.id} vaultName={vault.name} />
+                    )}
                   </div>
                 </div>
               );
