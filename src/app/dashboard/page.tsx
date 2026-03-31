@@ -119,8 +119,8 @@ export default async function Dashboard() {
                   
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-500">₦{(vault.currentAmount / 100).toFixed(2)}</span>
-                      <span className="text-gray-900 font-medium">Goal: ₦{(vault.targetAmount / 100).toFixed(2)}</span>
+                      <span className="text-gray-500">${(vault.currentAmount / 100).toFixed(2)}</span>
+                      <span className="text-gray-900 font-medium">Goal: ${(vault.targetAmount / 100).toFixed(2)}</span>
                     </div>
                     {/* Progress Bar */}
                     <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
@@ -177,7 +177,7 @@ export default async function Dashboard() {
                     txn.amount > 0 ? 'text-green-600' : 'text-gray-900'
                   }`}>
                     {txn.amount > 0 ? '+' : '-'} 
-                    ₦{(Math.abs(txn.amount) / 100).toFixed(2)}
+                    ${(Math.abs(txn.amount) / 100).toFixed(2)}
                   </td>
                   
                   <td className="px-6 py-4 text-right">

@@ -45,7 +45,7 @@ export default function DepositButton({ walletId }: { walletId: string }) {
       disabled={loading}
       className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
     >
-      {loading ? "Processing..." : "Add ₦5,000"}
+      {loading ? "Processing..." : "Add $5,000"}
     </button>
   );
 }

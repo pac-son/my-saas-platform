@@ -27,7 +27,7 @@ export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string
 
       if (!res.ok) throw new Error(data.error || "Failed to fund vault");
 
-      alert(`Success! Added ₦${amount} to ${vaultName}`);
+      alert(`Success! Added $${amount} to ${vaultName}`);
       setAmount("");
       setIsOpen(false);
       router.refresh(); 
@@ -55,7 +55,7 @@ export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string
             <form onSubmit={handleFund} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount to Add (₦)
+                  Amount to Add ($)
                 </label>
                 <input
                   type="number"

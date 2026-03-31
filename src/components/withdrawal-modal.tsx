@@ -27,7 +27,7 @@ export default function WithdrawalModal({ walletId }: { walletId: string }) {
 
       if (!res.ok) throw new Error(data.error || "Failed to withdraw");
 
-      alert(`Success! Withdrew ₦${amount}`);
+      alert(`Success! Withdrew $${amount}`);
       setAmount("");
       setIsOpen(false);
       router.refresh(); 
@@ -55,7 +55,7 @@ export default function WithdrawalModal({ walletId }: { walletId: string }) {
             <form onSubmit={handleWithdrawal} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount to Withdraw (₦)
+                  Amount to Withdraw ($)
                 </label>
                 <input
                   type="number"

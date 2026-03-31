@@ -28,7 +28,7 @@ export default function DepositModal({ walletId }: { walletId: string }) {
 
       if (!res.ok) throw new Error(data.error || "Failed");
 
-      alert(`Success! Added ₦${amount}`);
+      alert(`Success! Added $${amount}`);
       setAmount(""); // Clear input
       setIsOpen(false); // Close modal
       router.refresh(); // Update balance
@@ -61,7 +61,7 @@ export default function DepositModal({ walletId }: { walletId: string }) {
             <form onSubmit={handleDeposit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount (₦)
+                  Amount ($)
                 </label>
                 <input
                   type="number"

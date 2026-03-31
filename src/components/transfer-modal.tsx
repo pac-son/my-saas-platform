@@ -28,7 +28,7 @@ export default function TransferModal() {
 
       if (!res.ok) throw new Error(data.error || "Transfer failed");
 
-      alert(`Success! Sent ₦${amount} to ${email}`);
+      alert(`Success! Sent $${amount} to ${email}`);
       setEmail("");
       setAmount("");
       setIsOpen(false);
@@ -68,7 +68,7 @@ export default function TransferModal() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
                 <input
                   type="number"
                   min="100"
