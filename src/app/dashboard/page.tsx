@@ -152,6 +152,7 @@ export default async function Dashboard() {
             <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
               <tr>
                 <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Description</th> {/* Added Description Column */}
                 <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3 text-right">Amount</th>
                 <th className="px-6 py-3 text-right">Status</th>
@@ -161,15 +162,24 @@ export default async function Dashboard() {
               {wallet.transactions.map((txn) => (
                 <tr key={txn.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
-                    {new Date(txn.createdAt!).toLocaleDateString()}
+                    {txn.createdAt ? new Date(txn.createdAt).toLocaleDateString() : 'N/A'}
                   </td>
+                  
+                  {/* New Description Data */}
+                  <td className="px-6 py-4 text-gray-900 truncate max-w-50">
+                    {txn.description || 'System Transaction'}
+                  </td>
+
                   <td className="px-6 py-4 capitalize">{txn.type}</td>
+                  
+                  {/* Smarter Math logic: Checks if money is positive or negative instead of just checking the word "deposit" */}
                   <td className={`px-6 py-4 text-right font-medium ${
-                    txn.type === 'deposit' ? 'text-green-600' : 'text-gray-900'
+                    txn.amount > 0 ? 'text-green-600' : 'text-gray-900'
                   }`}>
-                    {txn.type === 'deposit' ? '+' : '-'} 
-                    {(txn.amount / 100).toFixed(2)}
+                    {txn.amount > 0 ? '+' : '-'} 
+                    ₦{(Math.abs(txn.amount) / 100).toFixed(2)}
                   </td>
+                  
                   <td className="px-6 py-4 text-right">
                     <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 capitalize">
                       {txn.status}
