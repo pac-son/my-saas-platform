@@ -14,28 +14,27 @@ export default function DepositModal({ walletId }: { walletId: string }) {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/deposit", {
+      // call Stripe route
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          walletId,
           amount: parseFloat(amount), 
-          reference: `WEB-${Date.now()}`,
         }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Failed");
+      if (!res.ok) throw new Error(data.error || "Failed to initialize checkout");
 
-      alert(`Success! Added $${amount}`);
-      setAmount(""); // Clear input
-      setIsOpen(false); // Close modal
-      router.refresh(); // Update balance
+      // Redirect the user to the secure Stripe URL
+      if (data.url) {
+        window.location.href = data.url;
+      }
+      
     } catch (error: any) {
       alert(error.message);
-    } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 
@@ -65,7 +64,7 @@ export default function DepositModal({ walletId }: { walletId: string }) {
                 </label>
                 <input
                   type="number"
-                  min="100" // Minimum deposit
+                  min="50" // Minimum deposit
                   step="0.01"
                   required
                   value={amount}

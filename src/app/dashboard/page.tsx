@@ -152,7 +152,7 @@ export default async function Dashboard() {
             <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
               <tr>
                 <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Description</th> {/* Added Description Column */}
+                <th className="px-6 py-3">Description</th> 
                 <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3 text-right">Amount</th>
                 <th className="px-6 py-3 text-right">Status</th>
