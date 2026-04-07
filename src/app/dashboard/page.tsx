@@ -1,4 +1,5 @@
 import DepositModal from "@/components/deposit-modal";
+import { UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { users, wallets, transactions, vaults } from "@/db/schema"; 
@@ -78,6 +79,7 @@ export default async function Dashboard() {
             <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-gray-500 font-mono">
               Wallet ID: {wallet.id}
             </div>
+            <UserButton />
         </header>
 
         {/* 💳 Balance Card */}
