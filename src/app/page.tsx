@@ -56,7 +56,7 @@ export default function Home() {
           
           {/* B2B Infrastructure */}
           <SNBLWidget 
-            merchantKey="pk_test_f93786bb1b8de428f82505d4207f5096" 
+            merchantKey="pk_test_27941a37aa703fbf5f94b0b963e0c27a" 
             productId="prod_ps5_pro_123"
             productName="PlayStation 5 Pro"
             price={499.00}

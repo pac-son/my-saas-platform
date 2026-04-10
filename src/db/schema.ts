@@ -15,6 +15,7 @@ export const merchants = pgTable('merchants', {
   // API Keys for their Shopify/WooCommerce backend to talk to us
   publishableKey: text('publishable_key').notNull().unique(), 
   secretKey: text('secret_key').notNull().unique(),
+  webhookUrl: varchar('webhook_url', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
