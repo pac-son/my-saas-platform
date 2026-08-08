@@ -7,10 +7,10 @@ export async function POST(request: Request) {
   try {
     // 1. Parse the incoming JSON body
     const body = await request.json();
-    const { email, fullName } = body;
+    const { id, email, fullName } = body;
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    if (!id || !email) {
+      return NextResponse.json({ error: 'ID and Email are required' }, { status: 400 });
     }
 
     // 2. Database Logic: Create User + Wallet (Atomic Transaction)
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       const [newUser] = await tx
         .insert(users)
         .values({
+          id,
           email,
           fullName,
         })
