@@ -62,6 +62,25 @@ export const vaults = pgTable('vaults', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+//The Webhook Queue for Enterprise Reliability
+export const webhookEvents = pgTable('webhook_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  merchantId: uuid('merchant_id').references(() => merchants.id).notNull(),
+  vaultId: uuid('vault_id').references(() => vaults.id).notNull(),
+  
+  // What are we sending?
+  eventType: varchar('event_type', { length: 255 }).notNull(), // e.g., 'snbl.order.fully_funded'
+  payload: text('payload').notNull(), // We will stringify the JSON data here
+  
+  // Delivery Tracking
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // 'pending', 'success', 'failed'
+  attempts: integer('attempts').notNull().default(0),
+  lastAttemptAt: timestamp('last_attempt_at'),
+  nextAttemptAt: timestamp('next_attempt_at').defaultNow(), // For exponential backoff
+  
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   wallet: one(wallets, {
     fields: [users.id],
@@ -83,3 +102,35 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     references: [wallets.id],
   }),
 }));
+
+export const vaultsRelations = relations(vaults, ({ one, many }) => ({
+  merchant: one(merchants, {
+    fields: [vaults.merchantId],
+    references: [merchants.id],
+  }),
+  webhookEvents: many(webhookEvents),
+}));
+
+export const merchantsRelations = relations(merchants, ({ many }) => ({
+  vaults: many(vaults),
+  webhookEvents: many(webhookEvents),
+}));
+
+export const webhookEventsRelations = relations(webhookEvents, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [webhookEvents.merchantId],
+    references: [merchants.id],
+  }),
+  vault: one(vaults, {
+    fields: [webhookEvents.vaultId],
+    references: [vaults.id],
+  }),
+}));
+
+// The Idempotency Lock Table
+export const idempotencyKeys = pgTable('idempotency_keys', {
+  key: varchar('key', { length: 255 }).primaryKey(), // The unique ID sent by the frontend
+  userId: text('user_id').notNull().references(() => users.id),
+  action: varchar('action', { length: 255 }).notNull(), // e.g., 'fund_vault'
+  createdAt: timestamp('created_at').defaultNow(),
+});

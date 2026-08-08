@@ -1,76 +1,62 @@
-import { NextResponse } from "next/server";
-import Stripe from "stripe";
-import { db } from "@/db";
-import { wallets, transactions } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
-import { headers } from "next/headers";
+import { headers } from 'next/headers';
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { db } from '@/db';
+import { wallets } from '@/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16" as any,
+// Initialize Stripe (You'll need to add your STRIPE_SECRET_KEY to your .env file)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2024-04-10' as any, // Use the latest API version
 });
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 export async function POST(req: Request) {
+  const body = await req.text(); // Stripe requires the raw body, not JSON
+  const signature = (await headers()).get('Stripe-Signature') as string;
+
+  let event: Stripe.Event;
+
   try {
-    // 1. Get the raw body and signature
-    const body = await req.text();
-    const signature = (await headers()).get("Stripe-Signature");
-
-    if (!signature) {
-      return NextResponse.json({ error: "No signature" }, { status: 400 });
-    }
-
-    // 2. Verify the event came from Stripe
-    let event: Stripe.Event;
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err: any) {
-      console.error("Webhook signature verification failed.", err.message);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-    }
-
-    // 3. Handle successful payments
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      
-      // Grab the custom data we passed in during checkout
-      const userId = session.metadata?.userId;
-      const amountTotal = session.amount_total; 
-
-      if (!userId || !amountTotal) {
-        throw new Error("Missing user ID or amount in session metadata");
-      }
-
-      // 4. Atomic Database Update (The magic part)
-      await db.transaction(async (tx) => {
-        const wallet = await tx.query.wallets.findFirst({
-          where: eq(wallets.userId, userId),
-        });
-
-        if (!wallet) throw new Error("Wallet not found");
-
-        // A. Add money to the wallet
-        await tx.update(wallets)
-          .set({ balance: sql`${wallets.balance} + ${amountTotal}` })
-          .where(eq(wallets.id, wallet.id));
-
-        // B. Record the transaction
-        await tx.insert(transactions).values({
-          walletId: wallet.id,
-          amount: amountTotal,
-          type: "deposit",
-          status: "completed",
-          reference: (session.payment_intent as string) || `STRIPE-${Date.now()}`,
-          description: "Stripe Card Deposit",
-        });
-      });
-    }
-
-    return NextResponse.json({ received: true }, { status: 200 });
-
+    // SECURITY: Verify the webhook actually came from Stripe using your Webhook Secret
+    // You will get this secret when you run the Stripe CLI
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET as string 
+    );
   } catch (error: any) {
-    console.error("Webhook Error:", error);
-    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
+    console.error('⚠️ Webhook signature verification failed.', error.message);
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
+
+  // Handle the specific event when a checkout session is completely paid
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    // We need to know WHO paid and HOW MUCH
+    // We expect you passed the userId in the metadata when you created the Checkout Session
+    const userId = session.metadata?.userId;
+    const amountPaidInCents = session.amount_total;
+
+    if (userId && amountPaidInCents) {
+      console.log(`💰 Payment received! Adding ${amountPaidInCents} cents to user ${userId}`);
+
+      try {
+        // Atomic Update: Add the money directly to their wallet
+        await db.update(wallets)
+          .set({ balance: sql`${wallets.balance} + ${amountPaidInCents}` })
+          .where(eq(wallets.userId, userId));
+          
+        console.log('✅ Wallet updated successfully');
+      } catch (dbError) {
+        console.error('❌ Database failed to update wallet:', dbError);
+        return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+      }
+    } else {
+      console.error('❌ Missing userId or amount in session metadata');
+    }
+  }
+
+  // Always return a 200 OK to Stripe so they know we received it
+  return NextResponse.json({ received: true }, { status: 200 });
 }

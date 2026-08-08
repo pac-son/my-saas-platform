@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string, vaultName: string }) {
+  const { isLoaded } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,17 +16,22 @@ export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string
     setLoading(true);
 
     try {
+      // 1. Generate a unique key for THIS specific button click
+      const idempotencyKey = crypto.randomUUID();
+
       const res = await fetch("/api/vaults/fund", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey // 👈 Send it to the backend!
+        },
         body: JSON.stringify({
           vaultId,
-          amount: parseFloat(amount),
+          amountToFund: parseFloat(amount), 
         }),
       });
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Failed to fund vault");
 
       alert(`Success! Added $${amount} to ${vaultName}`);
@@ -32,7 +39,7 @@ export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string
       setIsOpen(false);
       router.refresh(); 
     } catch (error: any) {
-      alert(error.message); // This will catch "Insufficient funds"
+      alert(error.message);
     } finally {
       setLoading(false);
     }
@@ -80,7 +87,7 @@ export default function FundVaultModal({ vaultId, vaultName }: { vaultId: string
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !amount}
+                  disabled={loading || !amount || !isLoaded}
                   className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50"
                 >
                   {loading ? "Processing..." : "Transfer to Vault"}

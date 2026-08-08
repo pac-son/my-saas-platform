@@ -1,81 +1,105 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { wallets, vaults, transactions } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { vaults, wallets, merchants, webhookEvents, idempotencyKeys } from '@/db/schema'; 
+import { eq, sql } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // 1. GRAB THE IDEMPOTENCY KEY FROM THE HEADER
+    const idempotencyKey = request.headers.get('idempotency-key');
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'Missing Idempotency Key' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { vaultId, amount } = body;
-
-    if (!vaultId || !amount || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid funding amount' }, { status: 400 });
+    const { vaultId, amountToFund } = await request.json();
+    
+    if (!amountToFund || isNaN(amountToFund) || amountToFund <= 0) {
+      return NextResponse.json({ error: 'Please enter a valid funding amount' }, { status: 400 });
     }
 
-    const amountInKobo = Math.round(amount * 100);
-
-    // The Atomic Swap
-    const result = await db.transaction(async (tx) => {
-      
-      // 1. Get the User's Main Wallet
-      const wallet = await tx.query.wallets.findFirst({
-        where: eq(wallets.userId, userId),
+    // 2. THE LOCK: Attempt to save the key to the database FIRST
+    try {
+      await db.insert(idempotencyKeys).values({
+        key: idempotencyKey,
+        userId: userId,
+        action: `fund_vault_${vaultId}`
       });
+    } catch (lockError: any) {
+      // If Postgres throws an error, it means the Primary Key (the idempotencyKey) already exists!
+      // This means this is a duplicate request. We return 200 OK so the frontend thinks it worked, 
+      // but we safely abort BEFORE moving any money.
+      console.warn(` Blocked duplicate transaction for key: ${idempotencyKey}`);
+      return NextResponse.json({ success: true, message: 'Already processed' }, { status: 200 });
+    }
 
-      if (!wallet) throw new Error("Wallet not found");
-      if (wallet.balance < amountInKobo) throw new Error("Insufficient funds in main wallet");
+    const amountInCents = Math.round(amountToFund * 100);
 
-      // 2. Get the Vault (Ensure it belongs to this user)
-      const vault = await tx.query.vaults.findFirst({
-        where: and(eq(vaults.id, vaultId), eq(vaults.userId, userId)),
-      });
-
-      if (!vault) throw new Error("Vault not found");
-
-      // 3. Deduct from Main Wallet
-      await tx.update(wallets)
-        .set({
-          balance: sql`${wallets.balance} - ${amountInKobo}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(wallets.id, wallet.id));
-
-      // 4. Add to Vault
-      // Check if this deposit completes the goal
-      const newAmount = vault.currentAmount + amountInKobo;
-      const newStatus = newAmount >= vault.targetAmount ? 'completed' : 'active';
-
-      await tx.update(vaults)
-        .set({
-          currentAmount: newAmount,
-          status: newStatus,
-          updatedAt: new Date(),
-        })
-        .where(eq(vaults.id, vault.id));
-
-      // 5. Create a Ledger Entry so they see it in their history
-      await tx.insert(transactions).values({
-        walletId: wallet.id,
-        amount: -amountInKobo, // Negative because it left the main wallet
-        type: 'transfer', 
-        status: 'completed',
-        reference: `VLT-FUND-${Date.now()}`,
-        description: `Transferred to vault: ${vault.name}`,
-      });
-
-      return { success: true, newStatus };
+    // 1. Get the user's wallet and the target vault
+    const userWallet = await db.query.wallets.findFirst({ where: eq(wallets.userId, userId) });
+    const targetVault = await db.query.vaults.findFirst({
+      where: eq(vaults.id, vaultId),
+      with: { merchant: true } // Pull the merchant data so we get their webhook URL
     });
 
-    return NextResponse.json(result, { status: 200 });
+    if (!userWallet || !targetVault) throw new Error('Wallet or Vault not found');
+    if (userWallet.balance < amountInCents) throw new Error('Insufficient funds in wallet');
+
+    // 2. Atomic Transaction: Move money from Wallet -> Vault
+    await db.transaction(async (tx) => {
+      // Deduct from Wallet
+      await tx.update(wallets)
+        .set({ balance: sql`${wallets.balance} - ${amountInCents}` })
+        .where(eq(wallets.id, userWallet.id));
+
+      // Add to Vault
+      await tx.update(vaults)
+        .set({ currentAmount: sql`${vaults.currentAmount} + ${amountInCents}` })
+        .where(eq(vaults.id, targetVault.id));
+    });
+
+    // 3. Re-fetch the updated vault to check its new balance
+    const updatedVault = await db.query.vaults.findFirst({ where: eq(vaults.id, vaultId) });
+
+    // 🚀 4. THE BULLETPROOF QUEUE
+    if (updatedVault && updatedVault.currentAmount >= updatedVault.targetAmount && updatedVault.status !== 'completed') {
+      
+      // Update vault status to completed
+      await db.update(vaults).set({ status: 'completed' }).where(eq(vaults.id, vaultId));
+
+      // Instead of firing the webhook immediately, we write it to the database queue!
+      if (targetVault.merchant?.webhookUrl) {
+        
+        const eventPayload = {
+          event: 'snbl.order.fully_funded',
+          data: {
+            productId: targetVault.productId,
+            vaultId: targetVault.id,
+            customerClerkId: userId,
+            totalPaidCents: updatedVault.currentAmount
+          }
+        };
+
+        // Insert into the new queue table
+        await db.insert(webhookEvents).values({
+          merchantId: targetVault.merchant.id,
+          vaultId: targetVault.id,
+          eventType: 'snbl.order.fully_funded',
+          payload: JSON.stringify(eventPayload),
+          status: 'pending',
+          attempts: 0,
+        });
+
+        console.log(`📥 Webhook queued for ${targetVault.merchant.businessName}.`);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: 'Vault funded successfully' }, { status: 200 });
 
   } catch (error: any) {
-    console.error('Fund Vault Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fund vault' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
