@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { merchants, vaults } from "@/db/schema";
+import { merchants, vaults, webhookEvents } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { UserButton } from "@clerk/nextjs";
 import MerchantCredentials from "@/components/merchant-credentials";
+import WebhookEventLog from "@/components/webhook-event-log";
 import Link from "next/link";
 
 export default async function MerchantDashboard() {
@@ -45,6 +46,13 @@ export default async function MerchantDashboard() {
   const pendingOrders = await db.query.vaults.findMany({
     where: eq(vaults.merchantId, merchant.id),
     orderBy: [desc(vaults.createdAt)],
+  });
+
+  // 3. Fetch recent webhook events for this merchant
+  const recentWebhookEvents = await db.query.webhookEvents.findMany({
+    where: eq(webhookEvents.merchantId, merchant.id),
+    orderBy: [desc(webhookEvents.createdAt)],
+    limit: 20,
   });
 
   return (
@@ -134,6 +142,18 @@ export default async function MerchantDashboard() {
             </table>
           </div>
         </section>
+
+        {/* Section 4: Webhook Event Log */}
+        <WebhookEventLog
+          events={recentWebhookEvents.map((e) => ({
+            id: e.id,
+            eventType: e.eventType,
+            status: e.status,
+            attempts: e.attempts,
+            lastAttemptAt: e.lastAttemptAt?.toISOString() || null,
+            createdAt: e.createdAt?.toISOString() || null,
+          }))}
+        />
 
       </div>
     </div>

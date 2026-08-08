@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { webhookEvents, merchants } from '@/db/schema';
+import { webhookEvents } from '@/db/schema';
 import { eq, and, lte, lt } from 'drizzle-orm';
+import { signWebhook } from '@/lib/webhook-signer';
 
 const MAX_ATTEMPTS = 5;
 
 export async function GET(request: Request) {
   try {
-    // SECURITY: In production, verify the request comes from Vercel CRON
-    // const authHeader = request.headers.get('authorization');
-    // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) return new Response('Unauthorized', { status: 401 });
+    // SECURITY: Verify the request comes from Vercel CRON or an authorized caller
+    const authHeader = request.headers.get('authorization');
+    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
 
     const now = new Date();
 
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
         lt(webhookEvents.attempts, MAX_ATTEMPTS),
         lte(webhookEvents.nextAttemptAt, now)
       ),
-      with: { merchant: true } // Pull merchant so we have their webhookUrl
+      with: { merchant: true } // Pull merchant so we have their webhookUrl + secretKey
     });
 
     if (pendingEvents.length === 0) {
@@ -37,10 +40,19 @@ export async function GET(request: Request) {
       let success = false;
       
       try {
-        // Fire the missile to the Merchant's server
+        // Generate cryptographic signature so the merchant can verify authenticity
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const signature = signWebhook(event.merchant.secretKey, timestamp, event.payload);
+
+        // Fire the webhook to the Merchant's server with signed headers
         const response = await fetch(event.merchant.webhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'SaveUp-Webhook/1.0',
+            'X-SaveUp-Signature': signature,
+            'X-SaveUp-Timestamp': timestamp,
+          },
           body: event.payload,
         });
 
@@ -87,4 +99,4 @@ export async function GET(request: Request) {
     console.error('CRON Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-}
+}
